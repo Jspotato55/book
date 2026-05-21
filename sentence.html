@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentence Focus Reader v4</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #1a1a1a;
+            --accent: #4A90E2;
+            --badge-bg: #f39c12;
+        }
+        body.dark-mode {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --accent: #3498db;
+            --badge-bg: #d35400;
+        }
+        body {
+            font-family: 'Georgia', serif;
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            transition: 0.3s;
+            overflow: hidden;
+        }
+        #theme-btn {
+            position: fixed; top: 20px; right: 20px;
+            padding: 8px 12px; cursor: pointer;
+            background: none; border: 1px solid var(--text-color);
+            color: var(--text-color); border-radius: 4px;
+        }
+        /* 입력 화면 */
+        #setup-container {
+            width: 80%; max-width: 600px; text-align: center;
+        }
+        textarea {
+            width: 100%; height: 250px; padding: 15px;
+            font-size: 16px; border: 1px solid #ccc; border-radius: 8px;
+            margin-bottom: 20px; background: inherit; color: inherit;
+        }
+        .main-btn {
+            padding: 15px 40px; font-size: 18px; font-weight: bold;
+            background-color: var(--accent); color: white;
+            border: none; border-radius: 8px; cursor: pointer;
+        }
+        /* 독해 화면 */
+        #reader-container {
+            display: none; /* 기본 숨김 */
+            flex-direction: column;
+            align-items: center;
+            width: 90%; max-width: 900px;
+            text-align: center;
+        }
+        #badge {
+            background-color: var(--badge-bg); color: white;
+            padding: 5px 15px; border-radius: 20px;
+            font-size: 14px; margin-bottom: 20px; font-weight: bold;
+        }
+        #display {
+            font-size: 32px; line-height: 1.5; min-height: 200px;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 40px; word-break: keep-all;
+        }
+        .nav-btns button {
+            padding: 10px 25px; margin: 0 10px; font-size: 16px;
+            cursor: pointer; border-radius: 5px; border: 1px solid #ccc;
+            background: #eee; color: #333;
+        }
+        #prog-text { margin-top: 20px; font-size: 14px; opacity: 0.6; }
+    </style>
+</head>
+<body>
+
+    <button id="theme-btn" onclick="toggleTheme()">Dark Mode</button>
+
+    <div id="setup-container">
+        <h2>Reader Setup</h2>
+        <textarea id="raw-text" placeholder="여기에 원서 텍스트를 붙여넣으세요..."></textarea><br>
+        <button class="main-btn" onclick="initReader()">시작하기</button>
+    </div>
+
+    <div id="reader-container">
+        <div id="badge">¶ 문단 시작</div>
+        <div id="display">문장이 여기에 표시됩니다.</div>
+        <div class="nav-btns">
+            <button onclick="move(-1)">이전 (←)</button>
+            <button onclick="move(1)" style="background: var(--accent); color:white; border:none;">다음 (→ / Space)</button>
+        </div>
+        <div id="prog-text">0 / 0</div>
+        <button onclick="location.reload()" style="margin-top:40px; background:none; border:none; color:inherit; text-decoration:underline; cursor:pointer; opacity:0.5;">초기화</button>
+    </div>
+
+    <script>
+        let items = [];
+        let cur = 0;
+
+        function toggleTheme() {
+            document.body.classList.toggle('dark-mode');
+        }
+
+        function initReader() {
+            const raw = document.getElementById('raw-text').value.trim();
+            if (!raw) return alert("텍스트를 입력해주세요!");
+
+            items = [];
+            const paras = raw.split(/\n+/);
+
+            paras.forEach((p, pIdx) => {
+                // 더 튼튼한 문장 분리: 기호(.!?) 뒤에 공백이 오는 지점을 기준으로 자름
+                const sentences = p.split(/(?<=[.!?])\s+/);
+                
+                sentences.forEach((s, sIdx) => {
+                    const clean = s.trim();
+                    if (clean.length > 1) {
+                        items.push({
+                            txt: clean,
+                            isNewPara: (sIdx === 0),
+                            pNum: pIdx + 1
+                        });
+                    }
+                });
+            });
+
+            if (items.length > 0) {
+                document.getElementById('setup-container').style.display = 'none';
+                document.getElementById('reader-container').style.display = 'flex';
+                update();
+            } else {
+                alert("문장을 분석할 수 없습니다.");
+            }
+        }
+
+        function update() {
+            const data = items[cur];
+            document.getElementById('display').innerText = data.txt;
+            document.getElementById('prog-text').innerText = `Sentence ${cur + 1} / ${items.length}`;
+            
+            const badge = document.getElementById('badge');
+            if (data.isNewPara) {
+                badge.style.visibility = 'visible';
+                badge.innerText = `¶ Paragraph ${data.pNum}`;
+            } else {
+                badge.style.visibility = 'hidden';
+            }
+        }
+
+        function move(dir) {
+            const next = cur + dir;
+            if (next >= 0 && next < items.length) {
+                cur = next;
+                update();
+            } else if (next >= items.length) {
+                alert("마지막 문장입니다!");
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (document.getElementById('reader-container').style.display === 'flex') {
+                if (e.key === 'ArrowRight' || e.key === ' ') {
+                    e.preventDefault();
+                    move(1);
+                } else if (e.key === 'ArrowLeft') {
+                    move(-1);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
